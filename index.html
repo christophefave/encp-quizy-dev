@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quizy</title>
+    
+    <!-- Favicons -->
+    <link rel="icon" href="logo.svg" type="image/svg+xml">
+    <link rel="shortcut icon" href="logo.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="logo.svg">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons via CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Configuration Tailwind pour les couleurs de l'ENCP -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        encp: {
+                            dark: '#310A27',
+                            orange: '#E05A00',
+                            lightpink: '#FAD4D8',
+                            darkpink: '#C94A65',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Empêcher le pull-to-refresh sur mobile */
+        html, body {
+            overscroll-behavior-y: none;
+        }
+        
+        /* Animations fluides */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+        /* Cacher la scrollbar pour un look plus propre */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Scrollbar personnalisée pour les menus déroulants */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    </style>
+</head>
+<body class="bg-[#F9FAFB] text-gray-900 font-sans min-h-screen flex flex-col selection:bg-encp-lightpink selection:text-encp-dark">
+
+    <!-- En-tête -->
+    <header class="bg-encp-dark border-b border-encp-dark/80 sticky top-0 z-20 shadow-md overflow-hidden relative">
+        <!-- Decorative circles -->
+        <div class="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full border-4 border-white/5 pointer-events-none"></div>
+        <div class="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 rounded-full border-4 border-white/5 pointer-events-none"></div>
+        
+        <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between relative z-10">
+            <div class="flex items-center gap-3 font-extrabold text-2xl text-white cursor-pointer tracking-tight hover:opacity-90 transition-opacity" onclick="resetQuiz()">
+                <div class="bg-white p-1.5 rounded-xl shadow-sm transform -rotate-3">
+                    <img src="logo.svg" alt="Quizy Logo" class="w-6 h-6" />
+                </div>
+                Quizy
+            </div>
+            <button id="quit-btn" onclick="quitQuiz()" class="hidden text-sm font-semibold text-encp-lightpink hover:text-white transition-colors bg-white/10 px-4 py-2 rounded-lg">
+                Quitter le quiz
+            </button>
+        </div>
+    </header>
+
+    <!-- Contenu Principal -->
+    <main id="app" class="flex-grow max-w-5xl mx-auto px-4 py-8 md:py-12 w-full">
+        <!-- Le contenu sera injecté ici par JavaScript -->
+    </main>
+
+    <!-- Logique de l'application (Vanilla JS) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+    // 1. TA CONFIGURATION (Copie celle de ta console Firebase ici)
+    const firebaseConfig = {
+        apiKey: "AIzaSyBf1CKN-uw7p_6Ud_K13YpC5gcHdZ_wzG8",
+        authDomain: "quizy-9f784.firebaseapp.com",
+        projectId: "quizy-9f784",
+        storageBucket: "quizy-9f784.firebasestorage.app",
+        messagingSenderId: "217535736846",
+        appId: "1:217535736846:web:bfebc9087904b0bf72605f"
+    };
+
+    // 2. INITIALISATION
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // 3. FONCTION POUR ENVOYER LE SCORE
+    window.submitFirebaseScore = async (entry) => {
+        try {
+            await db.collection("highscores").add({
+                prenom: entry.prenom,
+                promo: entry.promo,
+                ville: entry.ville,
+                time: entry.time,
+                subject: entry.subject,
+                date: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await refreshHighScores(); // Recharge les scores après l'envoi
+        } catch (e) {
+            console.error("Erreur Firebase : ", e);
+        }
+    };
+
+    // 4. FONCTION POUR RÉCUPÉRER LES SCORES
+    window.refreshHighScores = async () => {
+        const snapshot = await db.collection("highscores").orderBy("time", "asc").get();
+        const scores = {};
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (!scores[data.subject]) scores[data.subject] = [];
+            scores[data.subject].push(data);
+        });
+        window.firebaseHighScores = scores;
+    };
+
+    // Charger les scores au démarrage
+    window.refreshHighScores();
+    </script>
+    <script>
+        // --- DONNÉES DE SECOURS (Intégrées directement pour que ça marche même sans fichier externe) ---
+        const fallbackData = [
+          {
+            "categorie": "Anatomie",
+            "sous_thematique": "Membres inférieurs, Analyse du mouvement",
+            "question": "A quelle action le grand fessier ne participe pas :",
+            "options": [
+              "la rotation interne de la coxo-fémorale",
+              "l’adduction de la coxo-fémorale",
+              "l’abduction de la coxo-fémorale",
+              "l’extension de la coxo-fémorale."
+            ],
+            "reponse": "la rotation interne de la coxo-fémorale",
+            "feedback": "Le grand fessier est le principal extenseur de la hanche et un puissant rotateur externe. Les faisceaux supérieurs font de l'abduction et les inférieurs de l'adduction. La rotation interne est quant à elle assurée principalement par le petit et le moyen fessier."
+          },
+          {
+            "categorie": "Anatomie",
+            "sous_thematique": "Tronc et Rachis",
+            "question": "Quel terme fait référence aux muscles abdominaux ?",
+            "options": [
+              "le couturier",
+              "la ligne blanche",
+              "le droit interne"
+            ],
+            "reponse": "la ligne blanche",
+            "feedback": "Parmi les options, seule la ligne blanche (bande aponévrotique séparant les deux grands droits) se situe sur l'abdomen. Le couturier (sartorius) et le droit interne (gracile) sont des muscles de la cuisse."
+          },
+          {
+            "categorie": "Anatomie",
+            "sous_thematique": "Tronc et Rachis, Analyse du mouvement",
+            "question": "Afin d’engager le muscle transverse, la consigne à donner est :",
+            "options": [
+              "De gonfler le ventre à l’expiration",
+              "De gonfler le ventre à l’inspiration",
+              "De rentrer le ventre à l’expiration"
+            ],
+            "reponse": "De rentrer le ventre à l’expiration",
+            "feedback": "Le transverse est le muscle profond de l'abdomen. Son rôle est de retenir les viscères (effet 'gaine'). L'action de rentrer le ventre (réduction du diamètre ombilical) couplée à l'expiration forcée permet son recrutement optimal."
+          },
+          {
+            "categorie": "Anatomie",
+            "sous_thematique": "Tronc et Rachis",
+            "question": "Comment se nomme la ligne qui sépare le droit de l’abdomen en deux ?",
+            "options": [
+              "La ligne âpre",
+              "La symphyse pubienne",
+              "La ligne blanche",
+              "La ligne transversale"
+            ],
+            "reponse": "La ligne blanche",
+            "feedback": "La ligne blanche (linea alba) est une intersection tendineuse verticale qui sépare les deux ventres musculaires du grand droit de l'abdomen, allant de l'appendice xiphoïde au pubis."
+          },
+          {
+            "categorie": "Anatomie",
+            "sous_thematique": "Tronc et Rachis",
+            "question": "Le Grand droit s'étend de l'apophyse xiphoïde et de la face antérieure des côtes 5-6 -7 …",
+            "options": [
+              "Jusqu'au pubis",
+              "Jusqu'à la crête iliaque"
+            ],
+            "reponse": "Jusqu'au pubis",
+            "feedback": "Le grand droit s'insère en haut sur le sternum (apophyse xiphoïde) et les cartilages costaux, et descend verticalement pour se terminer en bas sur le bord supérieur du pubis."
+          },
+          {
+            "categorie": "Anatomie",
+            "sous_thematique": "Tronc et Rachis, Analyse du mouvement",
+            "question": "Les muscles grands droits de l’abdomen sont :",
+            "options": [
+              "extenseurs du rachis dorso-lombaire",
+              "fléchisseurs du rachis dorso-lombaire",
+              "fléchisseurs de la coxo-fémorale"
+            ],
+            "reponse": "fléchisseurs du rachis dorso-lombaire",
+            "feedback": "En rapprochant le sternum du pubis (contraction concentrique), le grand droit provoque la flexion de la colonne vertébrale (du tronc sur le bassin ou inversement)."
+          },
+          {
+            "categorie": "Anatomie",
+            "sous_thematique": "Tronc et Rachis",
+            "question": "Quel muscle fait partie de la ceinture abdominale ?",
+            "options": [
+              "Oblique interne",
+              "Rhomboïde",
+              "Soléaire"
+            ],
+            "reponse": "Oblique interne",
+            "feedback": "L'oblique interne (ou petit oblique) forme avec l'oblique externe, le transverse et le grand droit, la sangle abdominale. Le rhomboïde est dans le dos, le soléaire dans le mollet."
+          }
+        ];
+
+        // --- GESTION DES MENUS DÉROULANTS ---
+        function toggleDropdown(id) {
+            ['file', 'theme'].forEach(otherId => {
+                if (otherId !== id) {
+                    const otherOptions = document.getElementById(`options-${otherId}`);
+                    const otherChevron = document.getElementById(`chevron-${otherId}`);
+                    if (otherOptions && !otherOptions.classList.contains('invisible')) {
+                        otherOptions.classList.add('invisible', 'opacity-0', '-translate-y-2');
+                        if (otherChevron) otherChevron.classList.remove('rotate-180');
+                    }
+                }
+            });
+
+            const options = document.getElementById(`options-${id}`);
+            const chevron = document.getElementById(`chevron-${id}`);
+            if (options) {
+                if (options.classList.contains('invisible')) {
+                    options.classList.remove('invisible', 'opacity-0', '-translate-y-2');
+                    if (chevron) chevron.classList.add('rotate-180');
+                } else {
+                    options.classList.add('invisible', 'opacity-0', '-translate-y-2');
+                    if (chevron) chevron.classList.remove('rotate-180');
+                }
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.custom-dropdown')) {
+                ['file', 'theme'].forEach(id => {
+                    const options = document.getElementById(`options-${id}`);
+                    const chevron = document.getElementById(`chevron-${id}`);
+                    if (options && !options.classList.contains('invisible')) {
+                        options.classList.add('invisible', 'opacity-0', '-translate-y-2');
+                        if (chevron) chevron.classList.remove('rotate-180');
+                    }
+                });
+            }
+        });
+
+        // --- ÉTAT DE L'APPLICATION ---
+        window.state = {
+            view: 'home', // 'home', 'training', 'test', 'challenge', 'results', 'training_results', 'challenge_form', 'high_scores'
+            quizMode: null, // 'training', 'test', 'challenge'
+            allQuestions: [],
+            filteredQuestions: [],
+            currentQuestionIndex: 0,
+            userAnswers: {},
+            showFeedback: false,
+            selectedFile: 'anatomie.json',
+            selectedSubTheme: 'Toutes',
+            subThemes: ['Toutes'],
+            trainingStats: { answered: 0, correct: 0 },
+            challengeStartTime: null,
+            challengeEndTime: null,
+            challengeTime: null,
+            currentScore: null,
+            lastChallengeEntry: null
+        };
+        // Pour compatibilité avec le code existant
+        let state = window.state;
+
+        function saveState() {
+            const stateToSave = {
+                view: state.view,
+                quizMode: state.quizMode,
+                filteredQuestions: state.filteredQuestions,
+                currentQuestionIndex: state.currentQuestionIndex,
+                userAnswers: state.userAnswers,
+                showFeedback: state.showFeedback,
+                selectedFile: state.selectedFile,
+                selectedSubTheme: state.selectedSubTheme,
+                trainingStats: state.trainingStats,
+                challengeStartTime: state.challengeStartTime,
+                challengeEndTime: state.challengeEndTime,
+                challengeTime: state.challengeTime,
+                currentScore: state.currentScore,
+                lastChallengeEntry: state.lastChallengeEntry
+            };
+            localStorage.setItem('quizy_state', JSON.stringify(stateToSave));
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem('quizy_state');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    Object.assign(state, parsed);
+                    return true;
+                } catch (e) {
+                    console.error("Erreur de lecture du state", e);
+                }
+            }
+            return false;
+        }
+
+        // --- ANIMATION ---
+        function triggerAnimation() {
+            const app = document.getElementById('app');
+            app.classList.remove('fade-in');
+            void app.offsetWidth; // trigger reflow
+            app.classList.add('fade-in');
+        }
+
+        // --- CHARGEMENT DES DONNÉES ---
+        async function loadData() {
+            try {
+                // Tente de charger le fichier JSON depuis le dossier 'data'
+                // Le chemin relatif 'data/...' fonctionne parfaitement sur Github Pages
+                const res = await fetch('data/' + state.selectedFile);
+                if (!res.ok) throw new Error('Fichier introuvable');
+                state.allQuestions = await res.json();
+            } catch (error) {
+                console.warn('Utilisation des données intégrées de secours.', error);
+                // Si le fetch échoue (ex: ouverture locale file:// ou fichier manquant), on utilise les données de secours
+                state.allQuestions = fallbackData;
+            }
+            
+            // Extraction des sous-thématiques uniques
+            const themes = new Set();
+            state.allQuestions.forEach(q => {
+                if (q.sous_thematique) {
+                    q.sous_thematique.split(',').forEach(t => themes.add(t.trim()));
+                }
+            });
+            state.subThemes = ['Toutes', ...Array.from(themes).sort()];
+            
+            if (!state.subThemes.includes(state.selectedSubTheme)) {
+                state.selectedSubTheme = 'Toutes';
+            }
+            
+            render();
+        }
+
+        async function handleFileChange(file) {
+            state.selectedFile = file;
+            state.selectedSubTheme = 'Toutes';
+            await loadData();
+            saveState();
+        }
+
+        function handleThemeChange(theme) {
+            state.selectedSubTheme = theme;
+            saveState();
+            render();
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // --- LOGIQUE DU QUIZ ---
+        let timerInterval = null;
+
+        function startChallengeTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const timerElement = document.getElementById('challenge-timer');
+                if (timerElement && state.challengeStartTime) {
+                    const elapsed = Date.now() - state.challengeStartTime;
+                    timerElement.innerHTML = formatChallengeTime(elapsed);
+                } else if (!timerElement) {
+                    // Stop timer if we are no longer in the challenge view
+                    clearInterval(timerInterval);
+                }
+            }, 100);
+        }
+
+        function formatChallengeTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+            const tenths = Math.floor((ms % 1000) / 100);
+            return `${minutes}:${seconds}.${tenths}`;
+        }
+
+        function startQuiz(mode) {
+            state.quizMode = mode;
+            let questions = [...state.allQuestions];
+            
+            // Filtrage par sous-thématique
+            if (mode !== 'challenge' && state.selectedSubTheme !== 'Toutes') {
+                questions = questions.filter(q => q.sous_thematique.includes(state.selectedSubTheme));
+            }
+            
+            // Mélange des questions (Fisher-Yates)
+            shuffleArray(questions);
+            
+            // Mélange des options pour chaque question
+            questions = questions.map(q => {
+                let opts = [...q.options];
+                shuffleArray(opts);
+                return { ...q, options: opts };
+            });
+
+            // Mode Test et Challenge : sélection de 20 max
+            if (mode === 'test' || mode === 'challenge') {
+                questions = questions.slice(0, 20);
+            }
+
+            if (questions.length === 0) {
+                alert("Aucune question trouvée pour cette sélection.");
+                return;
+            }
+
+            state.filteredQuestions = questions;
+            state.currentQuestionIndex = 0;
+            state.userAnswers = {};
+            state.showFeedback = false;
+            state.trainingStats = { answered: 0, correct: 0 };
+            state.view = mode;
+            
+            if (mode === 'challenge') {
+                state.challengeStartTime = Date.now();
+                startChallengeTimer();
+            }
+            
+            saveState();
+            render();
+            triggerAnimation();
+        }
+
+        function handleAnswer(encodedAnswer) {
+            if (state.userAnswers[state.currentQuestionIndex]) return; // Déjà répondu
+            
+            const answer = decodeURIComponent(encodedAnswer);
+            state.userAnswers[state.currentQuestionIndex] = answer;
+            
+            const q = state.filteredQuestions[state.currentQuestionIndex];
+            
+            if (state.view === 'training') {
+                state.trainingStats.answered++;
+                if (answer === q.reponse) {
+                    state.trainingStats.correct++;
+                }
+                state.showFeedback = true;
+                saveState();
+                render();
+            } else {
+                saveState();
+                render(); // Affiche la sélection en bleu
+                // Passage automatique à la question suivante en mode test
+                setTimeout(() => {
+                    nextQuestion();
+                }, 400);
+            }
+        }
+
+        function nextQuestion() {
+            if (state.view === 'training') {
+                state.currentQuestionIndex++;
+                if (state.currentQuestionIndex >= state.filteredQuestions.length) {
+                    // Remélanger les questions quand on arrive à la fin
+                    shuffleArray(state.filteredQuestions);
+                    // Remélanger les options pour chaque question
+                    state.filteredQuestions = state.filteredQuestions.map(q => {
+                        let opts = [...q.options];
+                        shuffleArray(opts);
+                        return { ...q, options: opts };
+                    });
+                    state.currentQuestionIndex = 0;
+                }
+                // Nettoyer la réponse pour la nouvelle question
+                delete state.userAnswers[state.currentQuestionIndex];
+                state.showFeedback = false;
+                saveState();
+                render();
+                triggerAnimation();
+            } else {
+                if (state.currentQuestionIndex < state.filteredQuestions.length - 1) {
+                    state.currentQuestionIndex++;
+                    state.showFeedback = false;
+                    saveState();
+                    render();
+                    triggerAnimation();
+                } else {
+                    if (state.view === 'challenge') {
+                        if (timerInterval) clearInterval(timerInterval);
+                        state.challengeEndTime = Date.now();
+                        state.challengeTime = state.challengeEndTime - state.challengeStartTime;
+                        
+                        let score = 0;
+                        state.filteredQuestions.forEach((q, idx) => {
+                            if (state.userAnswers[idx] === q.reponse) score++;
+                        });
+                        state.currentScore = score;
+                        
+                        if (score === state.filteredQuestions.length) {
+                            state.view = 'challenge_form';
+                        } else {
+                            state.view = 'high_scores';
+                        }
+                    } else {
+                        state.view = 'results';
+                    }
+                    saveState();
+                    render();
+                    triggerAnimation();
+                }
+            }
+        }
+
+        function quitQuiz() {
+            if (state.view === 'training' && state.trainingStats.answered > 0) {
+                state.view = 'training_results';
+                saveState();
+                render();
+                triggerAnimation();
+            } else {
+                resetQuiz();
+            }
+        }
+
+        function resetQuiz() {
+            if (timerInterval) clearInterval(timerInterval);
+            state.view = 'home';
+            state.quizMode = null;
+            state.currentQuestionIndex = 0;
+            state.userAnswers = {};
+            state.showFeedback = false;
+            state.trainingStats = { answered: 0, correct: 0 };
+            state.currentScore = null;
+            state.lastChallengeEntry = null;
+            localStorage.removeItem('quizy_state');
+            render();
+            triggerAnimation();
+        }
+
+        // --- RENDU DE L'INTERFACE (VUES) ---
+        window.render = function render() {
+            const app = document.getElementById('app');
+            const quitBtn = document.getElementById('quit-btn');
+            
+            if (state.view === 'home') {
+                quitBtn.classList.add('hidden');
+                app.innerHTML = renderHome();
+            } else if (state.view === 'training' || state.view === 'test' || state.view === 'challenge') {
+                quitBtn.classList.remove('hidden');
+                app.innerHTML = renderQuiz();
+            } else if (state.view === 'results') {
+                quitBtn.classList.add('hidden');
+                app.innerHTML = renderResults();
+            } else if (state.view === 'training_results') {
+                quitBtn.classList.add('hidden');
+                app.innerHTML = renderTrainingResults();
+            } else if (state.view === 'challenge_form') {
+                quitBtn.classList.add('hidden');
+                app.innerHTML = renderChallengeForm();
+            } else if (state.view === 'high_scores') {
+                quitBtn.classList.add('hidden');
+                app.innerHTML = renderHighScores();
+            }
+            
+            // Initialiser les icônes Lucide après chaque mise à jour du DOM
+            lucide.createIcons();
+        }
+
+        function renderHome() {
+            const files = [
+                { value: 'anatomie.json', label: 'Anatomie' },
+                { value: 'physiologie.json', label: 'Physiologie' },
+                { value: 'nutrition.json', label: 'Nutrition' }
+            ];
+            const selectedFileLabel = files.find(f => f.value === state.selectedFile)?.label || 'Anatomie';
+            
+            const fileOptionsHtml = files.map(f => `
+                <button onclick="handleFileChange('${f.value}')" class="w-full text-left px-4 py-3 rounded-xl transition-colors font-medium ${state.selectedFile === f.value ? 'bg-encp-lightpink/50 text-encp-darkpink' : 'hover:bg-gray-50 text-gray-700'}">
+                    ${f.label}
+                </button>
+            `).join('');
+
+            const themeOptionsHtml = state.subThemes.map(t => `
+                <button onclick="handleThemeChange('${t.replace(/'/g, "\\'")}')" class="w-full text-left px-4 py-3 rounded-xl transition-colors font-medium ${state.selectedSubTheme === t ? 'bg-encp-lightpink/50 text-encp-darkpink' : 'hover:bg-gray-50 text-gray-700'}">
+                    ${t}
+                </button>
+            `).join('');
+            
+            return `
+            <div class="max-w-3xl mx-auto">
+                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-8 relative">
+                    <!-- Decorative circles -->
+                    <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full border-4 border-white/5"></div>
+                    <div class="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full border-4 border-white/5"></div>
+                    
+                    <div class="p-10 md:p-14 text-center relative z-10 flex flex-col items-center justify-center">
+                        <div class="bg-white p-4 rounded-3xl shadow-xl mb-6 transform -rotate-3 hover:rotate-0 transition-transform duration-300">
+                            <img src="logo.svg" alt="Quizy Logo" class="w-16 h-16" />
+                        </div>
+                        <h1 class="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">Prêt à tester vos connaissances ?</h1>
+                        <p class="text-encp-lightpink text-lg max-w-lg mx-auto">Sélectionnez une matière et une thématique pour commencer votre entraînement.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-3xl shadow-xl p-8 md:p-10 space-y-8 border border-gray-100">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-2 custom-dropdown">
+                            <label class="block text-sm font-bold text-gray-700 uppercase tracking-wider">Matière</label>
+                            <div class="relative">
+                                <button onclick="toggleDropdown('file')" class="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-2xl flex justify-between items-center focus:border-encp-orange outline-none transition-all font-medium text-gray-800 hover:border-gray-300">
+                                    <span>${selectedFileLabel}</span>
+                                    <i data-lucide="chevron-down" class="w-5 h-5 text-gray-500 transition-transform duration-200" id="chevron-file"></i>
+                                </button>
+                                <div id="options-file" class="absolute z-30 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl opacity-0 invisible transform -translate-y-2 transition-all duration-200 overflow-hidden">
+                                    <div class="p-2 space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
+                                        ${fileOptionsHtml}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-2 custom-dropdown">
+                            <label class="block text-sm font-bold text-gray-700 uppercase tracking-wider">Sous-thématique</label>
+                            <div class="relative">
+                                <button onclick="toggleDropdown('theme')" class="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-2xl flex justify-between items-center focus:border-encp-orange outline-none transition-all font-medium text-gray-800 hover:border-gray-300">
+                                    <span class="truncate pr-4">${state.selectedSubTheme}</span>
+                                    <i data-lucide="chevron-down" class="w-5 h-5 text-gray-500 transition-transform duration-200 shrink-0" id="chevron-theme"></i>
+                                </button>
+                                <div id="options-theme" class="absolute z-30 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl opacity-0 invisible transform -translate-y-2 transition-all duration-200 overflow-hidden">
+                                    <div class="p-2 space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
+                                        ${themeOptionsHtml}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <button onclick="startQuiz('training')" class="group relative flex flex-col items-center justify-center gap-3 bg-white border-2 border-encp-darkpink/20 hover:border-encp-darkpink text-encp-dark p-8 rounded-3xl font-bold transition-all hover:shadow-lg hover:-translate-y-1">
+                            <div class="w-16 h-16 bg-encp-lightpink rounded-2xl flex items-center justify-center text-encp-darkpink group-hover:scale-110 transition-transform">
+                                <i data-lucide="book-open" class="w-8 h-8"></i>
+                            </div>
+                            <span class="text-lg">Entraînement</span>
+                            <span class="text-sm text-gray-500 font-normal text-center">Avec corrections</span>
+                        </button>
+                        <button onclick="startQuiz('test')" class="group relative flex flex-col items-center justify-center gap-3 bg-encp-orange text-white p-8 rounded-3xl font-bold transition-all hover:bg-[#c95000] hover:shadow-xl hover:shadow-encp-orange/30 hover:-translate-y-1">
+                            <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                                <i data-lucide="play" class="w-8 h-8 fill-current"></i>
+                            </div>
+                            <span class="text-lg">Test (20 Q)</span>
+                            <span class="text-sm text-white/80 font-normal text-center">Conditions réelles</span>
+                        </button>
+                    </div>
+                    <div class="mt-6">
+                        <button onclick="startQuiz('challenge')" class="w-full group relative flex flex-col items-center justify-center gap-4 bg-encp-dark text-white p-8 rounded-3xl font-bold transition-all hover:bg-[#4a103c] hover:shadow-xl hover:shadow-encp-dark/30 hover:-translate-y-1">
+                            <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-encp-orange group-hover:scale-110 transition-transform">
+                                <i data-lucide="timer" class="w-8 h-8"></i>
+                            </div>
+                            <span class="text-2xl">Mode Challenge</span>
+                            <span class="text-sm text-white/80 font-normal text-center max-w-lg leading-relaxed">
+                                <strong>Le but ultime :</strong> Obtenir 20/20 le plus rapidement possible !<br>
+                                Toutes les sous-thématiques sont mélangées. Seuls les sans-fautes entrent dans le classement des High Scores. Prêt à relever le défi ?
+                            </span>
+                        </button>
+                    </div>
+                    <div class="mt-8 flex justify-center">
+                        <button onclick="showHighScores()" class="flex items-center gap-2 text-encp-darkpink font-bold hover:text-encp-dark transition-colors bg-encp-lightpink/30 px-6 py-3 rounded-xl">
+                            <i data-lucide="trophy" class="w-5 h-5"></i> Voir les High Scores
+                        </button>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        function renderQuiz() {
+            const q = state.filteredQuestions[state.currentQuestionIndex];
+            if (!q) return '';
+            
+            const isTraining = state.view === 'training';
+            const userAnswer = state.userAnswers[state.currentQuestionIndex];
+            const isAnswered = !!userAnswer;
+            
+            let progressHtml = '';
+            let questionCounterHtml = '';
+            
+            if (isTraining) {
+                questionCounterHtml = `<span class="text-sm font-bold text-encp-darkpink bg-encp-lightpink px-3 py-1 rounded-full">Mode Entraînement</span>`;
+            } else if (state.view === 'challenge') {
+                const progress = ((state.currentQuestionIndex + 1) / state.filteredQuestions.length) * 100;
+                questionCounterHtml = `<span class="text-sm font-bold text-white bg-encp-orange px-3 py-1 rounded-full flex items-center gap-1"><i data-lucide="timer" class="w-4 h-4"></i> Challenge ${state.currentQuestionIndex + 1} / ${state.filteredQuestions.length}</span>
+                                       <span id="challenge-timer" class="text-sm font-mono font-bold text-encp-orange bg-orange-100 px-3 py-1 rounded-full flex items-center gap-1 ml-2">00:00.0</span>`;
+                progressHtml = `
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
+                    <div class="bg-encp-orange h-full rounded-full transition-all duration-500 ease-out" style="width: ${progress}%"></div>
+                </div>`;
+            } else {
+                const progress = ((state.currentQuestionIndex + 1) / state.filteredQuestions.length) * 100;
+                questionCounterHtml = `<span class="text-sm font-bold text-encp-dark bg-gray-100 px-3 py-1 rounded-full">Question ${state.currentQuestionIndex + 1} / ${state.filteredQuestions.length}</span>`;
+                progressHtml = `
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
+                    <div class="bg-encp-orange h-full rounded-full transition-all duration-500 ease-out" style="width: ${progress}%"></div>
+                </div>`;
+            }
+            
+            let optionsHtml = q.options.map((opt) => {
+                let btnClass = "w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 flex items-center justify-between font-medium ";
+                let iconHtml = '';
+                
+                if (isTraining && isAnswered) {
+                    if (opt === q.reponse) {
+                        btnClass += "border-green-500 bg-green-50 text-green-900 shadow-sm";
+                        iconHtml = `<i data-lucide="check-circle-2" class="text-green-500 w-6 h-6 ml-4 shrink-0"></i>`;
+                    } else if (opt === userAnswer) {
+                        btnClass += "border-red-500 bg-red-50 text-red-900 shadow-sm";
+                        iconHtml = `<i data-lucide="x-circle" class="text-red-500 w-6 h-6 ml-4 shrink-0"></i>`;
+                    } else {
+                        btnClass += "border-gray-100 bg-gray-50 text-gray-400 opacity-60";
+                    }
+                } else if (!isTraining && isAnswered && opt === userAnswer) {
+                    btnClass += "border-encp-orange bg-orange-50 text-encp-orange shadow-sm";
+                    iconHtml = `<i data-lucide="check-circle-2" class="text-encp-orange w-6 h-6 ml-4 shrink-0"></i>`;
+                } else {
+                    btnClass += "border-gray-200 hover:border-encp-orange hover:bg-orange-50 text-gray-700 cursor-pointer hover:shadow-md";
+                }
+                
+                const safeOpt = encodeURIComponent(opt).replace(/'/g, "%27");
+                
+                return `
+                <button onclick="handleAnswer('${safeOpt}')" ${isAnswered ? 'disabled' : ''} class="${btnClass}">
+                    <span class="text-base md:text-lg">${opt}</span>
+                    ${iconHtml}
+                </button>`;
+            }).join('');
+            
+            let feedbackHtml = '';
+            if (isTraining && state.showFeedback) {
+                feedbackHtml = `
+                <div class="bg-encp-lightpink/30 border-t-2 border-encp-lightpink p-6 md:p-8 fade-in">
+                    <h3 class="font-bold text-encp-dark mb-3 flex items-center gap-2 text-lg">
+                        <i data-lucide="lightbulb" class="text-encp-orange w-6 h-6"></i> Explication
+                    </h3>
+                    <p class="text-gray-800 leading-relaxed text-lg">${q.feedback}</p>
+                </div>`;
+            }
+            
+            let nextBtnHtml = '';
+            if (isAnswered && isTraining) {
+                nextBtnHtml = `
+                <div class="flex justify-end mt-8 fade-in">
+                    <button onclick="nextQuestion()" class="flex items-center gap-2 bg-encp-dark text-white px-8 py-4 rounded-2xl font-bold hover:bg-[#4a103c] transition-colors shadow-lg hover:-translate-y-1">
+                        Question suivante <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                    </button>
+                </div>`;
+            }
+
+            return `
+            <div class="max-w-3xl mx-auto">
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-sm font-black text-gray-400 uppercase tracking-widest">
+                            ${state.view === 'test' ? 'Évaluation' : (state.view === 'challenge' ? 'Challenge' : 'Pratique')}
+                        </span>
+                        ${questionCounterHtml}
+                    </div>
+                    ${progressHtml}
+                </div>
+                
+                <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+                    <div class="p-8 md:p-10">
+                        <div class="inline-block px-4 py-1.5 bg-encp-lightpink text-encp-darkpink text-xs font-bold uppercase tracking-wider rounded-full mb-6">
+                            ${q.sous_thematique}
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-extrabold text-encp-dark mb-10 leading-tight">
+                            ${q.question}
+                        </h2>
+                        <div class="space-y-4">
+                            ${optionsHtml}
+                        </div>
+                    </div>
+                    ${feedbackHtml}
+                </div>
+                ${nextBtnHtml}
+            </div>
+            `;
+        }
+
+        function renderResults() {
+            let score = 0;
+            state.filteredQuestions.forEach((q, idx) => {
+                if (state.userAnswers[idx] === q.reponse) score++;
+            });
+            const percentage = Math.round((score / state.filteredQuestions.length) * 100);
+            
+            let correctionsHtml = state.filteredQuestions.map((q, idx) => {
+                const isCorrect = state.userAnswers[idx] === q.reponse;
+                const borderClass = isCorrect ? 'border-l-green-500' : 'border-l-red-500';
+                const iconHtml = isCorrect 
+                    ? `<div class="bg-green-100 p-2 rounded-full"><i data-lucide="check" class="text-green-600 w-6 h-6"></i></div>` 
+                    : `<div class="bg-red-100 p-2 rounded-full"><i data-lucide="x" class="text-red-600 w-6 h-6"></i></div>`;
+                
+                let correctAnsHtml = !isCorrect ? `
+                    <div class="bg-green-50 p-5 rounded-2xl border border-green-100">
+                        <div class="text-xs font-bold text-green-800 uppercase tracking-wider mb-2">Bonne réponse</div>
+                        <div class="font-semibold text-green-900 text-lg">${q.reponse}</div>
+                    </div>
+                ` : '';
+
+                return `
+                <div class="bg-white rounded-3xl p-6 md:p-8 shadow-md border border-gray-100 border-l-8 ${borderClass} mb-6">
+                    <div class="flex items-start gap-5 mb-6">
+                        <div class="shrink-0 mt-1">${iconHtml}</div>
+                        <div>
+                            <div class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Question ${idx + 1}</div>
+                            <h4 class="text-xl font-bold text-encp-dark leading-snug">${q.question}</h4>
+                        </div>
+                    </div>
+                    <div class="ml-14 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200">
+                                <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Votre réponse</div>
+                                <div class="font-semibold text-lg ${isCorrect ? 'text-green-700' : 'text-red-700'}">
+                                    ${state.userAnswers[idx] || "Aucune réponse"}
+                                </div>
+                            </div>
+                            ${correctAnsHtml}
+                        </div>
+                        <div class="bg-encp-lightpink/30 p-6 rounded-2xl text-encp-dark mt-4 border border-encp-lightpink/50">
+                            <div class="font-bold mb-2 flex items-center gap-2 text-encp-darkpink">
+                                <i data-lucide="info" class="w-5 h-5"></i> Explication
+                            </div>
+                            <p class="text-base leading-relaxed text-gray-800">${q.feedback}</p>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            return `
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-10 text-center p-12 relative">
+                    <!-- Decorative circles -->
+                    <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full border-4 border-white/5"></div>
+                    <div class="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full border-4 border-white/5"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="inline-flex items-center justify-center w-24 h-24 bg-encp-orange text-white rounded-full mb-6 shadow-lg shadow-encp-orange/40">
+                            <i data-lucide="award" class="w-12 h-12"></i>
+                        </div>
+                        <h2 class="text-4xl font-extrabold text-white mb-3 tracking-tight">Résultats du Test</h2>
+                        <p class="text-encp-lightpink text-lg mb-10">Voici votre score et la correction détaillée.</p>
+                        
+                        <div class="flex justify-center items-center gap-8 mb-12 bg-white/10 p-8 rounded-3xl backdrop-blur-sm max-w-2xl mx-auto">
+                            <div class="text-center">
+                                <div class="text-5xl md:text-6xl font-black text-white mb-2">${score}<span class="text-3xl text-white/50">/${state.filteredQuestions.length}</span></div>
+                                <div class="text-sm font-bold text-encp-lightpink uppercase tracking-widest">Score</div>
+                            </div>
+                            <div class="w-px h-20 bg-white/20"></div>
+                            <div class="text-center">
+                                <div class="text-5xl md:text-6xl font-black text-encp-orange mb-2">${percentage}%</div>
+                                <div class="text-sm font-bold text-encp-lightpink uppercase tracking-widest">Réussite</div>
+                            </div>
+                            ${state.quizMode === 'challenge' && state.challengeTime ? `
+                            <div class="w-px h-20 bg-white/20"></div>
+                            <div class="text-center">
+                                <div class="text-4xl md:text-5xl font-black text-white mb-2 font-mono">${formatChallengeTime(state.challengeTime)}</div>
+                                <div class="text-sm font-bold text-encp-lightpink uppercase tracking-widest">Temps</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="flex flex-col sm:flex-row justify-center gap-4">
+                            ${state.quizMode === 'challenge' ? `
+                            <button onclick="startQuiz('challenge')" class="inline-flex items-center justify-center gap-3 bg-encp-orange text-white px-8 py-4 rounded-2xl font-extrabold hover:bg-[#c95000] transition-all shadow-xl hover:-translate-y-1 text-lg">
+                                <i data-lucide="rotate-cw" class="w-6 h-6"></i> Recommencer
+                            </button>
+                            ` : `
+                            <button onclick="startQuiz('${state.quizMode || 'test'}')" class="inline-flex items-center justify-center gap-3 bg-encp-orange text-white px-8 py-4 rounded-2xl font-extrabold hover:bg-[#c95000] transition-all shadow-xl hover:-translate-y-1 text-lg">
+                                <i data-lucide="rotate-cw" class="w-6 h-6"></i> Recommencer
+                            </button>
+                            `}
+                            <button onclick="resetQuiz()" class="inline-flex items-center justify-center gap-3 bg-white text-encp-dark px-8 py-4 rounded-2xl font-extrabold hover:bg-gray-100 transition-all shadow-xl hover:-translate-y-1 text-lg">
+                                <i data-lucide="home" class="w-6 h-6"></i> Accueil
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-8">
+                    <h3 class="text-3xl font-extrabold text-encp-dark px-2 tracking-tight">Correction détaillée</h3>
+                    ${correctionsHtml}
+                </div>
+            </div>
+            `;
+        }
+
+        function renderTrainingResults() {
+            const answered = state.trainingStats.answered;
+            const correct = state.trainingStats.correct;
+            const incorrect = answered - correct;
+            const percentage = Math.round((correct / answered) * 100) || 0;
+
+            return `
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-10 text-center p-12 relative">
+                    <!-- Decorative circles -->
+                    <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full border-4 border-white/5"></div>
+                    <div class="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full border-4 border-white/5"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="inline-flex items-center justify-center w-24 h-24 bg-encp-orange text-white rounded-full mb-6 shadow-lg shadow-encp-orange/40">
+                            <i data-lucide="bar-chart-2" class="w-12 h-12"></i>
+                        </div>
+                        <h2 class="text-4xl font-extrabold text-white mb-3 tracking-tight">Rapport d'entraînement</h2>
+                        <p class="text-encp-lightpink text-lg mb-10">Voici le résumé de votre session d'entraînement.</p>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 max-w-3xl mx-auto">
+                            <div class="bg-white/10 p-6 rounded-3xl backdrop-blur-sm">
+                                <div class="text-4xl font-black text-white mb-2">${answered}</div>
+                                <div class="text-xs font-bold text-encp-lightpink uppercase tracking-widest">Questions</div>
+                            </div>
+                            <div class="bg-white/10 p-6 rounded-3xl backdrop-blur-sm">
+                                <div class="text-4xl font-black text-green-400 mb-2">${correct}</div>
+                                <div class="text-xs font-bold text-green-200 uppercase tracking-widest">Réussites</div>
+                            </div>
+                            <div class="bg-white/10 p-6 rounded-3xl backdrop-blur-sm">
+                                <div class="text-4xl font-black text-red-400 mb-2">${incorrect}</div>
+                                <div class="text-xs font-bold text-red-200 uppercase tracking-widest">Échecs</div>
+                            </div>
+                            <div class="bg-white/10 p-6 rounded-3xl backdrop-blur-sm">
+                                <div class="text-4xl font-black text-encp-orange mb-2">${percentage}%</div>
+                                <div class="text-xs font-bold text-orange-200 uppercase tracking-widest">Précision</div>
+                            </div>
+                        </div>
+                        <button onclick="resetQuiz()" class="inline-flex items-center gap-3 bg-white text-encp-dark px-10 py-5 rounded-2xl font-extrabold hover:bg-gray-100 transition-all shadow-xl hover:-translate-y-1 text-lg">
+                            <i data-lucide="home" class="w-6 h-6"></i> Quitter le rapport
+                        </button>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        function showHighScores() {
+            state.view = 'high_scores';
+            state.currentScore = null;
+            saveState();
+            render();
+            triggerAnimation();
+        }
+
+        function formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes}m ${seconds}s`;
+        }
+
+        function getHighScores() {
+            return window.firebaseHighScores || {};
+        }
+
+        async function submitChallenge(event) {
+            event.preventDefault();
+            const prenom = document.getElementById('c-prenom').value;
+            const promo = document.getElementById('c-promo').value;
+            const ville = document.getElementById('c-ville').value;
+            
+            const submitBtn = document.getElementById('submit-challenge-btn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>';
+            lucide.createIcons();
+            
+            const entry = {
+                subject: state.selectedFile,
+                prenom,
+                promo,
+                ville,
+                time: state.challengeTime,
+                date: new Date().toISOString()
+            };
+            
+            if (window.submitFirebaseScore) {
+                await window.submitFirebaseScore(entry);
+                // On utilise le prénom et le temps comme identifiant temporaire pour le surlignage
+                state.lastChallengeEntry = entry.prenom + '_' + entry.time;
+            }
+            
+            state.view = 'high_scores';
+            saveState();
+            render();
+            triggerAnimation();
+        }
+
+        function renderChallengeForm() {
+            return `
+            <div class="max-w-xl mx-auto">
+                <div class="bg-white rounded-3xl shadow-xl p-8 md:p-10 border border-gray-100 text-center">
+                    <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 text-green-500 rounded-full mb-6">
+                        <i data-lucide="check-circle" class="w-10 h-10"></i>
+                    </div>
+                    <h2 class="text-3xl font-extrabold text-encp-dark mb-2">Incroyable ! 20/20 !</h2>
+                    <p class="text-gray-600 mb-8">Vous avez terminé en <strong class="text-encp-orange">${formatTime(state.challengeTime)}</strong>. Entrez vos informations pour le classement.</p>
+                    
+                    <form id="challenge-form" onsubmit="submitChallenge(event)" class="space-y-4 text-left">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Prénom</label>
+                            <input type="text" id="c-prenom" required class="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Promo</label>
+                            <input type="text" id="c-promo" required class="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Ville du campus</label>
+                            <input type="text" id="c-ville" required class="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors">
+                        </div>
+                        <button type="submit" id="submit-challenge-btn" class="w-full bg-encp-orange text-white font-bold py-4 rounded-xl hover:bg-[#c95000] transition-colors mt-4 shadow-lg disabled:opacity-70">
+                            Enregistrer mon score
+                        </button>
+                    </form>
+                </div>
+            </div>
+            `;
+        }
+
+        function renderHighScores() {
+            const scores = getHighScores();
+            const currentSubjectScores = scores[state.selectedFile] || [];
+            
+            let messageHtml = '';
+            let correctionBtnHtml = '';
+            let restartBtnHtml = '';
+            
+            if (state.currentScore !== null) {
+                if (state.currentScore === state.filteredQuestions.length) {
+                    messageHtml = `<div class="bg-green-100 text-green-800 p-4 rounded-xl mb-6 font-bold text-center">Votre score a été enregistré !</div>`;
+                } else {
+                    messageHtml = `<div class="bg-orange-100 text-orange-800 p-4 rounded-xl mb-6 font-bold text-center">Vous avez obtenu ${state.currentScore}/${state.filteredQuestions.length}. Il faut 20/20 pour entrer dans le classement !</div>`;
+                    correctionBtnHtml = `
+                        <button onclick="state.view = 'results'; render(); triggerAnimation();" class="w-full mb-4 flex items-center justify-center gap-2 bg-encp-darkpink text-white px-6 py-3 rounded-xl font-bold hover:bg-[#a03a50] transition-colors">
+                            <i data-lucide="file-check-2" class="w-5 h-5"></i> Voir la correction du quiz
+                        </button>
+                    `;
+                }
+                restartBtnHtml = `
+                    <button onclick="startQuiz('challenge')" class="w-full mb-4 flex items-center justify-center gap-2 bg-encp-orange text-white px-6 py-3 rounded-xl font-bold hover:bg-[#c95000] transition-colors">
+                        <i data-lucide="rotate-cw" class="w-5 h-5"></i> Recommencer le challenge
+                    </button>
+                `;
+            }
+            
+            const files = [
+                { value: 'anatomie.json', label: 'Anatomie' },
+                { value: 'physiologie.json', label: 'Physiologie' },
+                { value: 'nutrition.json', label: 'Nutrition' }
+            ];
+            
+            const tabsHtml = files.map(f => `
+                <button onclick="state.selectedFile = '${f.value}'; render();" class="px-4 py-2 text-sm font-bold rounded-lg transition-colors ${state.selectedFile === f.value ? 'bg-encp-dark text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+                    ${f.label}
+                </button>
+            `).join('');
+
+            let tableHtml = '';
+            if (currentSubjectScores.length === 0) {
+                tableHtml = `<div class="text-center text-gray-500 py-8">Aucun score pour le moment. Soyez le premier !</div>`;
+            } else {
+                const top10 = currentSubjectScores.slice(0, 10);
+                let userRank = -1;
+                
+                if (state.lastChallengeEntry) {
+                    userRank = currentSubjectScores.findIndex(s => (s.prenom + '_' + s.time) === state.lastChallengeEntry) + 1;
+                }
+
+                tableHtml = `
+                <div class="overflow-hidden rounded-xl border border-gray-200">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                <th class="p-4 font-bold">Rang</th>
+                                <th class="p-4 font-bold">Joueur</th>
+                                <th class="p-4 font-bold">Campus</th>
+                                <th class="p-4 font-bold text-right">Temps</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${top10.map((s, idx) => {
+                                const isUser = (s.prenom + '_' + s.time) === state.lastChallengeEntry;
+                                let rankBadge = `${idx + 1}`;
+                                if (idx === 0) rankBadge = `<span class="text-yellow-500"><i data-lucide="trophy" class="w-5 h-5 inline"></i></span>`;
+                                else if (idx === 1) rankBadge = `<span class="text-gray-400"><i data-lucide="medal" class="w-5 h-5 inline"></i></span>`;
+                                else if (idx === 2) rankBadge = `<span class="text-amber-600"><i data-lucide="medal" class="w-5 h-5 inline"></i></span>`;
+                                
+                                return `
+                                <tr class="${isUser ? 'bg-encp-lightpink/30' : 'bg-white'}">
+                                    <td class="p-4 font-bold text-gray-700">${rankBadge}</td>
+                                    <td class="p-4">
+                                        <div class="font-bold text-encp-dark">${s.prenom}</div>
+                                        <div class="text-xs text-gray-500">Promo ${s.promo}</div>
+                                    </td>
+                                    <td class="p-4 text-sm text-gray-600">${s.ville}</td>
+                                    <td class="p-4 text-right font-mono font-bold text-encp-orange">${formatTime(s.time)}</td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                `;
+                
+                if (userRank > 10) {
+                    const s = currentSubjectScores[userRank - 1];
+                    tableHtml += `
+                    <div class="mt-4 p-4 bg-encp-lightpink/30 rounded-xl border border-encp-lightpink flex justify-between items-center">
+                        <div class="flex items-center gap-4">
+                            <div class="font-bold text-gray-700">#${userRank}</div>
+                            <div>
+                                <div class="font-bold text-encp-dark">${s.prenom}</div>
+                                <div class="text-xs text-gray-500">Promo ${s.promo}</div>
+                            </div>
+                        </div>
+                        <div class="font-mono font-bold text-encp-orange">${formatTime(s.time)}</div>
+                    </div>
+                    `;
+                }
+            }
+
+            return `
+            <div class="max-w-3xl mx-auto">
+                <div class="bg-white rounded-3xl shadow-xl p-8 md:p-10 border border-gray-100">
+                    <div class="flex items-center justify-center gap-3 mb-8">
+                        <i data-lucide="trophy" class="w-8 h-8 text-encp-orange"></i>
+                        <h2 class="text-3xl font-extrabold text-encp-dark">High Scores</h2>
+                    </div>
+                    
+                    ${messageHtml}
+                    
+                    <div class="flex flex-wrap gap-2 justify-center mb-6">
+                        ${tabsHtml}
+                    </div>
+                    
+                    ${tableHtml}
+                    
+                    <div class="mt-8">
+                        ${correctionBtnHtml}
+                        ${restartBtnHtml}
+                        <button onclick="resetQuiz()" class="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors">
+                            <i data-lucide="home" class="w-5 h-5"></i> Retour à l'accueil
+                        </button>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        // --- DÉMARRAGE ---
+        window.onload = async () => {
+            loadState();
+            await loadData();
+            triggerAnimation();
+        };
+    </script>
+</body>
+</html>

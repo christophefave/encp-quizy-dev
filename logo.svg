@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="darkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#310A27" />
+      <stop offset="100%" stop-color="#5A1245" />
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E05A00" />
+      <stop offset="100%" stop-color="#FF8C00" />
+    </linearGradient>
+  </defs>
+  <!-- Main circle of the Q -->
+  <circle cx="55" cy="55" r="40" fill="none" stroke="url(#darkGrad)" stroke-width="20" />
+  <!-- Dynamic Tail of the Q -->
+  <path d="M 65 65 L 100 100" stroke="url(#orangeGrad)" stroke-width="20" stroke-linecap="round" />
+  <!-- Inner dot -->
+  <circle cx="55" cy="55" r="12" fill="url(#orangeGrad)" />
+</svg>
