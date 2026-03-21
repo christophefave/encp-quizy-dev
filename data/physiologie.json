@@ -6866,18 +6866,6 @@
   {
     "categorie": "Physiologie",
     "sous_thematique": "contraction musculaire, qualités physiques",
-    "question": "Quel est le temps des effets retardés du régime concentrique ?",
-    "options": [
-      "8 semaines",
-      "12 semaines",
-      "4 semaines"
-    ],
-    "reponse": "4 semaines",
-    "feedback": "Dans la théorie de la planification (Cometti, Zatsiorsky), les effets physiologiques (hypertrophie, adaptation nerveuse) d'un cycle de musculation ne sont pas immédiats. Le travail concentrique traditionnel met environ 3 à 4 semaines pour que ses gains de force se stabilisent et se transfèrent dans le geste sportif."
-  },
-  {
-    "categorie": "Physiologie",
-    "sous_thematique": "contraction musculaire, qualités physiques",
     "question": "Quel est le temps des effets retardés du régime excentrique ?",
     "options": [
       "2 semaines",
