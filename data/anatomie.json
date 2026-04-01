@@ -3358,7 +3358,7 @@
   {
     "categorie": "Anatomie",
     "sous_thematique": "Membres supérieurs, Tronc et Rachis, Système ostéo-articulaire",
-    "question": "Quels sont les 3 muscles ayant une insertion ou terminaison au niveau de la gouttière bicipitale ?",
+    "question": "Quels sont les 4 muscles ayant une insertion ou terminaison au niveau de la gouttière bicipitale ?",
     "options": [
       "Grand pectoral / grand rond / brachial antérieur",
       "Grand pectoral / coraco brachial / triceps",
@@ -7789,5 +7789,59 @@
     "reponse": "Scapula",
     "feedback": "Le mot 'omoplate' (omoplat en vieux français) désigne l'os triangulaire plaqué au dos. En biomécanique moderne et médicale, on utilise presque systématiquement son terme latin : la scapula.",
     "niveau": "difficile"
+  },
+  {
+    "categorie": "Anatomie",
+    "sous_thematique": "Système ostéo-articulaire",
+    "question": "Le nom de la cellule de l’os est :",
+    "options": [
+      "Ostéoporose",
+      "Ostéophyte",
+      "Ostéopathe",
+      "Ostéocyte"
+    ],
+    "reponse": "Ostéocyte",
+    "feedback": "L'ostéocyte est la cellule mature du tissu osseux (emprisonnée dans la matrice minérale qu'elle entretient). L'ostéoblaste est la cellule qui construit l'os neuf, et l'ostéoclaste est celle qui le détruit. (L'ostéoporose est une maladie, l'ostéophyte est une excroissance, l'ostéopathe est un praticien).",
+    "niveau": "facile"
+  },
+  {
+    "categorie": "Anatomie",
+    "sous_thematique": "Système ostéo-articulaire",
+    "question": "La membrane qui entoure l’os s’appelle :",
+    "options": [
+      "L’endoste",
+      "L’épiphyse",
+      "La métaphyse",
+      "Le périoste"
+    ],
+    "reponse": "Le périoste",
+    "feedback": "Le périoste est la fine gaine conjonctive fibreuse, fortement vascularisée et très richement innervée, qui recouvre la face externe des os. C'est sur le périoste que viennent s'ancrer et fusionner les fibres de collagène des tendons et des ligaments. (C'est son inflammation qui cause la 'périostite' du coureur).",
+    "niveau": "facile"
+  },
+  {
+    "categorie": "Anatomie",
+    "sous_thematique": "Système ostéo-articulaire",
+    "question": "La pathologie de l’os qui sur le long terme crée des « Becs de perroquet » (ostéophyte) est :",
+    "options": [
+      "Fracture",
+      "Ostéoporose",
+      "Arthrose"
+    ],
+    "reponse": "Arthrose",
+    "feedback": "L'arthrose est la destruction irréversible du cartilage articulaire. Pour tenter de stabiliser l'articulation malade qui flotte, l'organisme va construire du mauvais os en périphérie des surfaces osseuses. Ce sont les ostéophytes, qui ont souvent l'apparence radiologique de 'becs de perroquet' dans la colonne vertébrale.",
+    "niveau": "facile"
+  },
+  {
+    "categorie": "Anatomie",
+    "sous_thematique": "Système ostéo-articulaire",
+    "question": "La pathologie de l’os qui le fragilise et le rend poreux est :",
+    "options": [
+      "Fracture",
+      "Arthrose",
+      "Ostéoporose"
+    ],
+    "reponse": "Ostéoporose",
+    "feedback": "Liée au vieillissement et à la chute hormonale (ménopause, baisse des œstrogènes), l'ostéoporose est un déséquilibre : les ostéoclastes détruisent plus d'os que les ostéoblastes n'en fabriquent. La trame minérale se vide, l'os devient poreux comme une éponge sèche et se fracture à la moindre chute (col du fémur).",
+    "niveau": "intermédiaire"
   }
 ]
