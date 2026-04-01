@@ -74,13 +74,13 @@
         <div class="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 rounded-full border-4 border-white/5 pointer-events-none"></div>
         
         <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between relative z-10">
-            <div class="flex items-center gap-3 font-extrabold text-2xl text-white cursor-pointer tracking-tight hover:opacity-90 transition-opacity" onclick="resetQuiz()">
+            <div class="flex items-center gap-2 sm:gap-3 font-extrabold text-xl sm:text-2xl text-white cursor-pointer tracking-tight hover:opacity-90 transition-opacity" onclick="resetQuiz()">
                 <div class="bg-white p-1.5 rounded-xl shadow-sm transform -rotate-3">
-                    <img src="logo.svg" alt="Quizy Logo" class="w-6 h-6" />
+                    <img src="logo.svg" alt="Quizy Logo" class="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 Quizy
             </div>
-            <button id="quit-btn" onclick="quitQuiz()" class="hidden text-sm font-semibold text-encp-lightpink hover:text-white transition-colors bg-white/10 px-4 py-2 rounded-lg">
+            <button id="quit-btn" onclick="quitQuiz()" class="hidden text-xs sm:text-sm font-semibold text-encp-lightpink hover:text-white transition-colors bg-white/10 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg">
                 Quitter le quiz
             </button>
         </div>
@@ -319,6 +319,18 @@
                 try {
                     const parsed = JSON.parse(saved);
                     Object.assign(state, parsed);
+                    
+                    // Reset challenge if refreshed during challenge to prevent cheating
+                    if (state.view === 'challenge') {
+                        state.view = 'challenge_intro';
+                        state.challengeStartTime = null;
+                        state.challengeEndTime = null;
+                        state.challengeTime = null;
+                        state.currentQuestionIndex = 0;
+                        state.userAnswers = {};
+                        state.currentScore = null;
+                    }
+                    
                     return true;
                 } catch (e) {
                     console.error("Erreur de lecture du state", e);
@@ -347,6 +359,19 @@
                 console.warn('Utilisation des données intégrées de secours.', error);
                 // Si le fetch échoue (ex: ouverture locale file:// ou fichier manquant), on utilise les données de secours
                 state.allQuestions = fallbackData;
+            }
+            
+            // Ajout d'une majuscule au début des sous-thématiques pour la physiologie
+            if (state.selectedFile === 'physiologie.json') {
+                state.allQuestions = state.allQuestions.map(q => {
+                    if (q.sous_thematique) {
+                        q.sous_thematique = q.sous_thematique.split(',').map(t => {
+                            let trimmed = t.trim();
+                            return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+                        }).join(', ');
+                    }
+                    return q;
+                });
             }
             
             // Extraction des sous-thématiques uniques
@@ -409,6 +434,14 @@
             const seconds = (totalSeconds % 60).toString().padStart(2, '0');
             const tenths = Math.floor((ms % 1000) / 100);
             return `${minutes}:${seconds}.${tenths}`;
+        }
+
+        function prepareChallenge() {
+            state.view = 'challenge_intro';
+            state.quizMode = 'challenge';
+            saveState();
+            render();
+            triggerAnimation();
         }
 
         function startQuiz(mode) {
@@ -571,6 +604,9 @@
             if (state.view === 'home') {
                 quitBtn.classList.add('hidden');
                 app.innerHTML = renderHome();
+            } else if (state.view === 'challenge_intro') {
+                quitBtn.classList.remove('hidden');
+                app.innerHTML = renderChallengeIntro();
             } else if (state.view === 'training' || state.view === 'test' || state.view === 'challenge') {
                 quitBtn.classList.remove('hidden');
                 app.innerHTML = renderQuiz();
@@ -614,28 +650,28 @@
             
             return `
             <div class="max-w-3xl mx-auto">
-                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-8 relative">
+                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-6 sm:mb-8 relative">
                     <!-- Decorative circles -->
                     <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full border-4 border-white/5"></div>
                     <div class="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full border-4 border-white/5"></div>
                     
-                    <div class="p-10 md:p-14 text-center relative z-10 flex flex-col items-center justify-center">
-                        <div class="bg-white p-4 rounded-3xl shadow-xl mb-6 transform -rotate-3 hover:rotate-0 transition-transform duration-300">
-                            <img src="logo.svg" alt="Quizy Logo" class="w-16 h-16" />
+                    <div class="p-8 sm:p-10 md:p-14 text-center relative z-10 flex flex-col items-center justify-center">
+                        <div class="bg-white p-3 sm:p-4 rounded-3xl shadow-xl mb-4 sm:mb-6 transform -rotate-3 hover:rotate-0 transition-transform duration-300">
+                            <img src="logo.svg" alt="Quizy Logo" class="w-12 h-12 sm:w-16 sm:h-16" />
                         </div>
-                        <h1 class="text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">Prêt à tester vos connaissances ?</h1>
-                        <p class="text-encp-lightpink text-lg max-w-lg mx-auto">Sélectionnez une matière et une thématique pour commencer votre entraînement.</p>
+                        <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-3 sm:mb-4 tracking-tight">Prêt à tester vos connaissances ?</h1>
+                        <p class="text-encp-lightpink text-base sm:text-lg max-w-lg mx-auto">Sélectionnez une matière et une thématique pour commencer votre entraînement.</p>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-3xl shadow-xl p-8 md:p-10 space-y-8 border border-gray-100">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white rounded-3xl shadow-xl p-6 sm:p-8 md:p-10 space-y-6 sm:space-y-8 border border-gray-100">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
                         <div class="space-y-2 custom-dropdown">
-                            <label class="block text-sm font-bold text-gray-700 uppercase tracking-wider">Matière</label>
+                            <label class="block text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wider">Matière</label>
                             <div class="relative">
-                                <button onclick="toggleDropdown('file')" class="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-2xl flex justify-between items-center focus:border-encp-orange outline-none transition-all font-medium text-gray-800 hover:border-gray-300">
-                                    <span>${selectedFileLabel}</span>
-                                    <i data-lucide="chevron-down" class="w-5 h-5 text-gray-500 transition-transform duration-200" id="chevron-file"></i>
+                                <button onclick="toggleDropdown('file')" class="w-full p-3 sm:p-4 bg-gray-50 border-2 border-gray-200 rounded-2xl flex justify-between items-center focus:border-encp-orange outline-none transition-all font-medium text-gray-800 hover:border-gray-300">
+                                    <span class="text-sm sm:text-base">${selectedFileLabel}</span>
+                                    <i data-lucide="chevron-down" class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 transition-transform duration-200" id="chevron-file"></i>
                                 </button>
                                 <div id="options-file" class="absolute z-30 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl opacity-0 invisible transform -translate-y-2 transition-all duration-200 overflow-hidden">
                                     <div class="p-2 space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
@@ -645,11 +681,11 @@
                             </div>
                         </div>
                         <div class="space-y-2 custom-dropdown">
-                            <label class="block text-sm font-bold text-gray-700 uppercase tracking-wider">Sous-thématique</label>
+                            <label class="block text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wider">Sous-thématique</label>
                             <div class="relative">
-                                <button onclick="toggleDropdown('theme')" class="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-2xl flex justify-between items-center focus:border-encp-orange outline-none transition-all font-medium text-gray-800 hover:border-gray-300">
-                                    <span class="truncate pr-4">${state.selectedSubTheme}</span>
-                                    <i data-lucide="chevron-down" class="w-5 h-5 text-gray-500 transition-transform duration-200 shrink-0" id="chevron-theme"></i>
+                                <button onclick="toggleDropdown('theme')" class="w-full p-3 sm:p-4 bg-gray-50 border-2 border-gray-200 rounded-2xl flex justify-between items-center focus:border-encp-orange outline-none transition-all font-medium text-gray-800 hover:border-gray-300">
+                                    <span class="truncate pr-4 text-sm sm:text-base">${state.selectedSubTheme}</span>
+                                    <i data-lucide="chevron-down" class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 transition-transform duration-200 shrink-0" id="chevron-theme"></i>
                                 </button>
                                 <div id="options-theme" class="absolute z-30 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl opacity-0 invisible transform -translate-y-2 transition-all duration-200 overflow-hidden">
                                     <div class="p-2 space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
@@ -660,38 +696,110 @@
                         </div>
                     </div>
 
-                    <div class="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <button onclick="startQuiz('training')" class="group relative flex flex-col items-center justify-center gap-3 bg-white border-2 border-encp-darkpink/20 hover:border-encp-darkpink text-encp-dark p-8 rounded-3xl font-bold transition-all hover:shadow-lg hover:-translate-y-1">
-                            <div class="w-16 h-16 bg-encp-lightpink rounded-2xl flex items-center justify-center text-encp-darkpink group-hover:scale-110 transition-transform">
-                                <i data-lucide="book-open" class="w-8 h-8"></i>
+                    <div class="pt-2 sm:pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                        <button onclick="startQuiz('training')" class="group relative flex flex-col items-center justify-center gap-2 sm:gap-3 bg-white border-2 border-encp-darkpink/20 hover:border-encp-darkpink text-encp-dark p-6 sm:p-8 rounded-3xl font-bold transition-all hover:shadow-lg hover:-translate-y-1">
+                            <div class="w-12 h-12 sm:w-16 sm:h-16 bg-encp-lightpink rounded-2xl flex items-center justify-center text-encp-darkpink group-hover:scale-110 transition-transform">
+                                <i data-lucide="book-open" class="w-6 h-6 sm:w-8 sm:h-8"></i>
                             </div>
-                            <span class="text-lg">Entraînement</span>
-                            <span class="text-sm text-gray-500 font-normal text-center">Avec corrections</span>
+                            <span class="text-base sm:text-lg">Mode Entraînement</span>
+                            <span class="text-xs sm:text-sm text-gray-500 font-normal text-center">Sans pression, correction après chaque question</span>
                         </button>
-                        <button onclick="startQuiz('test')" class="group relative flex flex-col items-center justify-center gap-3 bg-encp-orange text-white p-8 rounded-3xl font-bold transition-all hover:bg-[#c95000] hover:shadow-xl hover:shadow-encp-orange/30 hover:-translate-y-1">
-                            <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                                <i data-lucide="play" class="w-8 h-8 fill-current"></i>
+                        <button onclick="startQuiz('test')" class="group relative flex flex-col items-center justify-center gap-2 sm:gap-3 bg-encp-orange text-white p-6 sm:p-8 rounded-3xl font-bold transition-all hover:bg-[#c95000] hover:shadow-xl hover:shadow-encp-orange/30 hover:-translate-y-1">
+                            <div class="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-2xl flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                                <i data-lucide="play" class="w-6 h-6 sm:w-8 sm:h-8 fill-current"></i>
                             </div>
-                            <span class="text-lg">Test (20 Q)</span>
-                            <span class="text-sm text-white/80 font-normal text-center">Conditions réelles</span>
+                            <span class="text-base sm:text-lg">Mode Test</span>
+                            <span class="text-xs sm:text-sm text-white/80 font-normal text-center">20 questions pour se tester, avec une correction finale</span>
                         </button>
                     </div>
-                    <div class="mt-6">
-                        <button onclick="startQuiz('challenge')" class="w-full group relative flex flex-col items-center justify-center gap-4 bg-encp-dark text-white p-8 rounded-3xl font-bold transition-all hover:bg-[#4a103c] hover:shadow-xl hover:shadow-encp-dark/30 hover:-translate-y-1">
-                            <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-encp-orange group-hover:scale-110 transition-transform">
-                                <i data-lucide="timer" class="w-8 h-8"></i>
+                    <div class="mt-4 sm:mt-6">
+                        <button onclick="prepareChallenge()" class="w-full group relative flex flex-col items-center justify-center gap-3 sm:gap-4 bg-encp-dark text-white p-6 sm:p-8 rounded-3xl font-bold transition-all hover:bg-[#4a103c] hover:shadow-xl hover:shadow-encp-dark/30 hover:-translate-y-1">
+                            <div class="w-12 h-12 sm:w-16 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center text-encp-orange group-hover:scale-110 transition-transform">
+                                <i data-lucide="timer" class="w-6 h-6 sm:w-8 sm:h-8"></i>
                             </div>
-                            <span class="text-2xl">Mode Challenge</span>
-                            <span class="text-sm text-white/80 font-normal text-center max-w-lg leading-relaxed">
+                            <span class="text-xl sm:text-2xl">Mode Challenge</span>
+                            <span class="text-xs sm:text-sm text-white/80 font-normal text-center max-w-lg leading-relaxed">
                                 <strong>Le but ultime :</strong> Obtenir 20/20 le plus rapidement possible !<br>
                                 Toutes les sous-thématiques sont mélangées. Seuls les sans-fautes entrent dans le classement des High Scores. Prêt à relever le défi ?
                             </span>
                         </button>
                     </div>
-                    <div class="mt-8 flex justify-center">
-                        <button onclick="showHighScores()" class="flex items-center gap-2 text-encp-darkpink font-bold hover:text-encp-dark transition-colors bg-encp-lightpink/30 px-6 py-3 rounded-xl">
-                            <i data-lucide="trophy" class="w-5 h-5"></i> Voir les High Scores
+                    <div class="mt-6 sm:mt-8 flex justify-center">
+                        <button onclick="showHighScores()" class="flex items-center gap-2 text-encp-darkpink font-bold hover:text-encp-dark transition-colors bg-encp-lightpink/30 px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl text-sm sm:text-base">
+                            <i data-lucide="trophy" class="w-4 h-4 sm:w-5 sm:h-5"></i> Voir les High Scores
                         </button>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        function renderChallengeIntro() {
+            const files = [
+                { value: 'anatomie.json', label: 'Anatomie' },
+                { value: 'physiologie.json', label: 'Physiologie' },
+                { value: 'nutrition.json', label: 'Nutrition' }
+            ];
+            const subjectLabel = files.find(f => f.value === state.selectedFile)?.label || 'Anatomie';
+            
+            let bestScoreHtml = '';
+            if (window.firebaseHighScores && window.firebaseHighScores[state.selectedFile] && window.firebaseHighScores[state.selectedFile].length > 0) {
+                const bestScore = window.firebaseHighScores[state.selectedFile][0];
+                bestScoreHtml = `
+                        <div class="bg-white/10 rounded-2xl p-6 mb-8 inline-block text-left border border-white/10 backdrop-blur-sm">
+                            <p class="text-encp-lightpink text-xs uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
+                                <i data-lucide="crown" class="w-4 h-4"></i> Record à battre
+                            </p>
+                            <div class="flex items-center gap-4">
+                                <div class="bg-encp-orange text-white p-3 rounded-xl shadow-lg shadow-encp-orange/30">
+                                    <i data-lucide="trophy" class="w-6 h-6"></i>
+                                </div>
+                                <div>
+                                    <p class="text-white font-bold text-xl leading-tight">${bestScore.prenom} ${bestScore.promo ? `<span class="text-white/60 text-sm font-normal">(${bestScore.promo})</span>` : ''}</p>
+                                    <p class="text-encp-orange font-mono font-bold text-lg">${formatChallengeTime(bestScore.time)}</p>
+                                </div>
+                            </div>
+                        </div>
+                `;
+            } else {
+                bestScoreHtml = `
+                        <div class="bg-white/10 rounded-2xl p-6 mb-8 inline-block text-left border border-white/10 backdrop-blur-sm">
+                            <p class="text-encp-lightpink text-xs uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
+                                <i data-lucide="crown" class="w-4 h-4"></i> Record à battre
+                            </p>
+                            <div class="flex items-center gap-4">
+                                <div class="bg-white/10 text-white/50 p-3 rounded-xl">
+                                    <i data-lucide="trophy" class="w-6 h-6"></i>
+                                </div>
+                                <div>
+                                    <p class="text-white font-medium">Aucun record pour le moment.</p>
+                                    <p class="text-white/60 text-sm">Soyez le premier !</p>
+                                </div>
+                            </div>
+                        </div>
+                `;
+            }
+
+            return `
+            <div class="max-w-3xl mx-auto">
+                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-6 sm:mb-8 relative text-center p-8 sm:p-12">
+                    <!-- Decorative circles -->
+                    <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full border-4 border-white/5"></div>
+                    <div class="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full border-4 border-white/5"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="inline-flex items-center justify-center px-3 sm:px-4 py-1 sm:py-1.5 bg-encp-lightpink/20 text-encp-lightpink text-xs sm:text-sm font-bold uppercase tracking-wider rounded-full mb-4 sm:mb-6 border border-encp-lightpink/30">
+                            ${subjectLabel}
+                        </div>
+                        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-6 sm:mb-8 tracking-tight">Prêt à relever le défi ?</h2>
+                        
+                        ${bestScoreHtml}
+                        
+                        <div class="flex flex-col sm:flex-row justify-center gap-4">
+                            <button onclick="startQuiz('challenge')" class="inline-flex items-center justify-center gap-2 sm:gap-3 bg-encp-orange text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-extrabold hover:bg-[#c95000] transition-all shadow-xl hover:-translate-y-1 text-base sm:text-lg w-full sm:w-auto">
+                                <i data-lucide="play" class="w-5 h-5 sm:w-6 sm:h-6 fill-current"></i> Commencer
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -781,9 +889,9 @@
 
             return `
             <div class="max-w-3xl mx-auto">
-                <div class="mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="text-sm font-black text-gray-400 uppercase tracking-widest">
+                <div class="mb-4 sm:mb-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-3 sm:mb-4">
+                        <span class="text-xs sm:text-sm font-black text-gray-400 uppercase tracking-widest">
                             ${state.view === 'test' ? 'Évaluation' : (state.view === 'challenge' ? 'Challenge' : 'Pratique')}
                         </span>
                         ${questionCounterHtml}
@@ -792,14 +900,14 @@
                 </div>
                 
                 <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-                    <div class="p-8 md:p-10">
-                        <div class="inline-block px-4 py-1.5 bg-encp-lightpink text-encp-darkpink text-xs font-bold uppercase tracking-wider rounded-full mb-6">
+                    <div class="p-6 sm:p-8 md:p-10">
+                        <div class="inline-block px-3 sm:px-4 py-1 sm:py-1.5 bg-encp-lightpink text-encp-darkpink text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full mb-4 sm:mb-6">
                             ${q.sous_thematique}
                         </div>
-                        <h2 class="text-2xl md:text-3xl font-extrabold text-encp-dark mb-10 leading-tight">
+                        <h2 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-encp-dark mb-6 sm:mb-10 leading-tight">
                             ${q.question}
                         </h2>
-                        <div class="space-y-4">
+                        <div class="space-y-3 sm:space-y-4">
                             ${optionsHtml}
                         </div>
                     </div>
@@ -863,54 +971,56 @@
 
             return `
             <div class="max-w-4xl mx-auto">
-                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-10 text-center p-12 relative">
+                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-6 sm:mb-10 text-center p-6 sm:p-12 relative">
                     <!-- Decorative circles -->
                     <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full border-4 border-white/5"></div>
                     <div class="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full border-4 border-white/5"></div>
                     
                     <div class="relative z-10">
-                        <div class="inline-flex items-center justify-center w-24 h-24 bg-encp-orange text-white rounded-full mb-6 shadow-lg shadow-encp-orange/40">
-                            <i data-lucide="award" class="w-12 h-12"></i>
+                        <div class="inline-flex items-center justify-center w-16 h-16 sm:w-24 sm:h-24 bg-encp-orange text-white rounded-full mb-4 sm:mb-6 shadow-lg shadow-encp-orange/40">
+                            <i data-lucide="award" class="w-8 h-8 sm:w-12 sm:h-12"></i>
                         </div>
-                        <h2 class="text-4xl font-extrabold text-white mb-3 tracking-tight">Résultats du Test</h2>
-                        <p class="text-encp-lightpink text-lg mb-10">Voici votre score et la correction détaillée.</p>
+                        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-2 sm:mb-3 tracking-tight">Résultats du Test</h2>
+                        <p class="text-encp-lightpink text-base sm:text-lg mb-6 sm:mb-10">Voici votre score et la correction détaillée.</p>
                         
-                        <div class="flex justify-center items-center gap-8 mb-12 bg-white/10 p-8 rounded-3xl backdrop-blur-sm max-w-2xl mx-auto">
+                        <div class="flex flex-col sm:flex-row justify-center items-center gap-6 sm:gap-8 mb-8 sm:mb-12 bg-white/10 p-6 sm:p-8 rounded-3xl backdrop-blur-sm max-w-2xl mx-auto">
                             <div class="text-center">
-                                <div class="text-5xl md:text-6xl font-black text-white mb-2">${score}<span class="text-3xl text-white/50">/${state.filteredQuestions.length}</span></div>
-                                <div class="text-sm font-bold text-encp-lightpink uppercase tracking-widest">Score</div>
+                                <div class="text-4xl sm:text-5xl md:text-6xl font-black text-white mb-1 sm:mb-2">${score}<span class="text-2xl sm:text-3xl text-white/50">/${state.filteredQuestions.length}</span></div>
+                                <div class="text-xs sm:text-sm font-bold text-encp-lightpink uppercase tracking-widest">Score</div>
                             </div>
-                            <div class="w-px h-20 bg-white/20"></div>
+                            <div class="hidden sm:block w-px h-20 bg-white/20"></div>
+                            <div class="sm:hidden w-full h-px bg-white/20"></div>
                             <div class="text-center">
-                                <div class="text-5xl md:text-6xl font-black text-encp-orange mb-2">${percentage}%</div>
-                                <div class="text-sm font-bold text-encp-lightpink uppercase tracking-widest">Réussite</div>
+                                <div class="text-4xl sm:text-5xl md:text-6xl font-black text-encp-orange mb-1 sm:mb-2">${percentage}%</div>
+                                <div class="text-xs sm:text-sm font-bold text-encp-lightpink uppercase tracking-widest">Réussite</div>
                             </div>
                             ${state.quizMode === 'challenge' && state.challengeTime ? `
-                            <div class="w-px h-20 bg-white/20"></div>
+                            <div class="hidden sm:block w-px h-20 bg-white/20"></div>
+                            <div class="sm:hidden w-full h-px bg-white/20"></div>
                             <div class="text-center">
-                                <div class="text-4xl md:text-5xl font-black text-white mb-2 font-mono">${formatChallengeTime(state.challengeTime)}</div>
-                                <div class="text-sm font-bold text-encp-lightpink uppercase tracking-widest">Temps</div>
+                                <div class="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-1 sm:mb-2 font-mono">${formatChallengeTime(state.challengeTime)}</div>
+                                <div class="text-xs sm:text-sm font-bold text-encp-lightpink uppercase tracking-widest">Temps</div>
                             </div>
                             ` : ''}
                         </div>
-                        <div class="flex flex-col sm:flex-row justify-center gap-4">
+                        <div class="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
                             ${state.quizMode === 'challenge' ? `
-                            <button onclick="startQuiz('challenge')" class="inline-flex items-center justify-center gap-3 bg-encp-orange text-white px-8 py-4 rounded-2xl font-extrabold hover:bg-[#c95000] transition-all shadow-xl hover:-translate-y-1 text-lg">
-                                <i data-lucide="rotate-cw" class="w-6 h-6"></i> Recommencer
+                            <button onclick="prepareChallenge()" class="inline-flex items-center justify-center gap-2 sm:gap-3 bg-encp-orange text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-extrabold hover:bg-[#c95000] transition-all shadow-xl hover:-translate-y-1 text-base sm:text-lg w-full sm:w-auto">
+                                <i data-lucide="rotate-cw" class="w-5 h-5 sm:w-6 sm:h-6"></i> Recommencer
                             </button>
                             ` : `
-                            <button onclick="startQuiz('${state.quizMode || 'test'}')" class="inline-flex items-center justify-center gap-3 bg-encp-orange text-white px-8 py-4 rounded-2xl font-extrabold hover:bg-[#c95000] transition-all shadow-xl hover:-translate-y-1 text-lg">
-                                <i data-lucide="rotate-cw" class="w-6 h-6"></i> Recommencer
+                            <button onclick="startQuiz('${state.quizMode || 'test'}')" class="inline-flex items-center justify-center gap-2 sm:gap-3 bg-encp-orange text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-extrabold hover:bg-[#c95000] transition-all shadow-xl hover:-translate-y-1 text-base sm:text-lg w-full sm:w-auto">
+                                <i data-lucide="rotate-cw" class="w-5 h-5 sm:w-6 sm:h-6"></i> Recommencer
                             </button>
                             `}
-                            <button onclick="resetQuiz()" class="inline-flex items-center justify-center gap-3 bg-white text-encp-dark px-8 py-4 rounded-2xl font-extrabold hover:bg-gray-100 transition-all shadow-xl hover:-translate-y-1 text-lg">
-                                <i data-lucide="home" class="w-6 h-6"></i> Accueil
+                            <button onclick="resetQuiz()" class="inline-flex items-center justify-center gap-2 sm:gap-3 bg-white text-encp-dark px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-extrabold hover:bg-gray-100 transition-all shadow-xl hover:-translate-y-1 text-base sm:text-lg w-full sm:w-auto">
+                                <i data-lucide="home" class="w-5 h-5 sm:w-6 sm:h-6"></i> Accueil
                             </button>
                         </div>
                     </div>
                 </div>
-                <div class="space-y-8">
-                    <h3 class="text-3xl font-extrabold text-encp-dark px-2 tracking-tight">Correction détaillée</h3>
+                <div class="space-y-6 sm:space-y-8">
+                    <h3 class="text-2xl sm:text-3xl font-extrabold text-encp-dark px-2 tracking-tight">Correction détaillée</h3>
                     ${correctionsHtml}
                 </div>
             </div>
@@ -925,38 +1035,38 @@
 
             return `
             <div class="max-w-4xl mx-auto">
-                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-10 text-center p-12 relative">
+                <div class="bg-encp-dark rounded-3xl shadow-2xl overflow-hidden mb-6 sm:mb-10 text-center p-6 sm:p-12 relative">
                     <!-- Decorative circles -->
                     <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full border-4 border-white/5"></div>
                     <div class="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full border-4 border-white/5"></div>
                     
                     <div class="relative z-10">
-                        <div class="inline-flex items-center justify-center w-24 h-24 bg-encp-orange text-white rounded-full mb-6 shadow-lg shadow-encp-orange/40">
-                            <i data-lucide="bar-chart-2" class="w-12 h-12"></i>
+                        <div class="inline-flex items-center justify-center w-16 h-16 sm:w-24 sm:h-24 bg-encp-orange text-white rounded-full mb-4 sm:mb-6 shadow-lg shadow-encp-orange/40">
+                            <i data-lucide="bar-chart-2" class="w-8 h-8 sm:w-12 sm:h-12"></i>
                         </div>
-                        <h2 class="text-4xl font-extrabold text-white mb-3 tracking-tight">Rapport d'entraînement</h2>
-                        <p class="text-encp-lightpink text-lg mb-10">Voici le résumé de votre session d'entraînement.</p>
+                        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-2 sm:mb-3 tracking-tight">Rapport d'entraînement</h2>
+                        <p class="text-encp-lightpink text-base sm:text-lg mb-6 sm:mb-10">Voici le résumé de votre session d'entraînement.</p>
                         
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 max-w-3xl mx-auto">
-                            <div class="bg-white/10 p-6 rounded-3xl backdrop-blur-sm">
-                                <div class="text-4xl font-black text-white mb-2">${answered}</div>
-                                <div class="text-xs font-bold text-encp-lightpink uppercase tracking-widest">Questions</div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12 max-w-3xl mx-auto">
+                            <div class="bg-white/10 p-4 sm:p-6 rounded-3xl backdrop-blur-sm">
+                                <div class="text-3xl sm:text-4xl font-black text-white mb-1 sm:mb-2">${answered}</div>
+                                <div class="text-[10px] sm:text-xs font-bold text-encp-lightpink uppercase tracking-widest">Questions</div>
                             </div>
-                            <div class="bg-white/10 p-6 rounded-3xl backdrop-blur-sm">
-                                <div class="text-4xl font-black text-green-400 mb-2">${correct}</div>
-                                <div class="text-xs font-bold text-green-200 uppercase tracking-widest">Réussites</div>
+                            <div class="bg-white/10 p-4 sm:p-6 rounded-3xl backdrop-blur-sm">
+                                <div class="text-3xl sm:text-4xl font-black text-green-400 mb-1 sm:mb-2">${correct}</div>
+                                <div class="text-[10px] sm:text-xs font-bold text-green-200 uppercase tracking-widest">Réussites</div>
                             </div>
-                            <div class="bg-white/10 p-6 rounded-3xl backdrop-blur-sm">
-                                <div class="text-4xl font-black text-red-400 mb-2">${incorrect}</div>
-                                <div class="text-xs font-bold text-red-200 uppercase tracking-widest">Échecs</div>
+                            <div class="bg-white/10 p-4 sm:p-6 rounded-3xl backdrop-blur-sm">
+                                <div class="text-3xl sm:text-4xl font-black text-red-400 mb-1 sm:mb-2">${incorrect}</div>
+                                <div class="text-[10px] sm:text-xs font-bold text-red-200 uppercase tracking-widest">Échecs</div>
                             </div>
-                            <div class="bg-white/10 p-6 rounded-3xl backdrop-blur-sm">
-                                <div class="text-4xl font-black text-encp-orange mb-2">${percentage}%</div>
-                                <div class="text-xs font-bold text-orange-200 uppercase tracking-widest">Précision</div>
+                            <div class="bg-white/10 p-4 sm:p-6 rounded-3xl backdrop-blur-sm">
+                                <div class="text-3xl sm:text-4xl font-black text-encp-orange mb-1 sm:mb-2">${percentage}%</div>
+                                <div class="text-[10px] sm:text-xs font-bold text-orange-200 uppercase tracking-widest">Précision</div>
                             </div>
                         </div>
-                        <button onclick="resetQuiz()" class="inline-flex items-center gap-3 bg-white text-encp-dark px-10 py-5 rounded-2xl font-extrabold hover:bg-gray-100 transition-all shadow-xl hover:-translate-y-1 text-lg">
-                            <i data-lucide="home" class="w-6 h-6"></i> Quitter le rapport
+                        <button onclick="resetQuiz()" class="inline-flex items-center gap-2 sm:gap-3 bg-white text-encp-dark px-6 sm:px-10 py-3 sm:py-5 rounded-2xl font-extrabold hover:bg-gray-100 transition-all shadow-xl hover:-translate-y-1 text-base sm:text-lg w-full sm:w-auto justify-center">
+                            <i data-lucide="home" class="w-5 h-5 sm:w-6 sm:h-6"></i> Quitter le rapport
                         </button>
                     </div>
                 </div>
@@ -1018,27 +1128,27 @@
         function renderChallengeForm() {
             return `
             <div class="max-w-xl mx-auto">
-                <div class="bg-white rounded-3xl shadow-xl p-8 md:p-10 border border-gray-100 text-center">
-                    <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 text-green-500 rounded-full mb-6">
-                        <i data-lucide="check-circle" class="w-10 h-10"></i>
+                <div class="bg-white rounded-3xl shadow-xl p-6 sm:p-8 md:p-10 border border-gray-100 text-center">
+                    <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-green-100 text-green-500 rounded-full mb-4 sm:mb-6">
+                        <i data-lucide="check-circle" class="w-8 h-8 sm:w-10 sm:h-10"></i>
                     </div>
-                    <h2 class="text-3xl font-extrabold text-encp-dark mb-2">Incroyable ! 20/20 !</h2>
-                    <p class="text-gray-600 mb-8">Vous avez terminé en <strong class="text-encp-orange">${formatTime(state.challengeTime)}</strong>. Entrez vos informations pour le classement.</p>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-encp-dark mb-2">Incroyable ! 20/20 !</h2>
+                    <p class="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8">Vous avez terminé en <strong class="text-encp-orange">${formatTime(state.challengeTime)}</strong>. Entrez vos informations pour le classement.</p>
                     
                     <form id="challenge-form" onsubmit="submitChallenge(event)" class="space-y-4 text-left">
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Prénom</label>
-                            <input type="text" id="c-prenom" required class="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors">
+                            <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1">Prénom</label>
+                            <input type="text" id="c-prenom" required class="w-full p-2.5 sm:p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors text-sm sm:text-base">
                         </div>
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Promo</label>
-                            <input type="text" id="c-promo" required class="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors">
+                            <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1">Promo</label>
+                            <input type="text" id="c-promo" required class="w-full p-2.5 sm:p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors text-sm sm:text-base">
                         </div>
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Ville du campus</label>
-                            <input type="text" id="c-ville" required class="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors">
+                            <label class="block text-xs sm:text-sm font-bold text-gray-700 mb-1">Ville du campus</label>
+                            <input type="text" id="c-ville" required class="w-full p-2.5 sm:p-3 border-2 border-gray-200 rounded-xl focus:border-encp-orange outline-none transition-colors text-sm sm:text-base">
                         </div>
-                        <button type="submit" id="submit-challenge-btn" class="w-full bg-encp-orange text-white font-bold py-4 rounded-xl hover:bg-[#c95000] transition-colors mt-4 shadow-lg disabled:opacity-70">
+                        <button type="submit" id="submit-challenge-btn" class="w-full bg-encp-orange text-white font-bold py-3 sm:py-4 rounded-xl hover:bg-[#c95000] transition-colors mt-4 shadow-lg disabled:opacity-70 text-sm sm:text-base">
                             Enregistrer mon score
                         </button>
                     </form>
@@ -1057,18 +1167,18 @@
             
             if (state.currentScore !== null) {
                 if (state.currentScore === state.filteredQuestions.length) {
-                    messageHtml = `<div class="bg-green-100 text-green-800 p-4 rounded-xl mb-6 font-bold text-center">Votre score a été enregistré !</div>`;
+                    messageHtml = `<div class="bg-green-100 text-green-800 p-3 sm:p-4 rounded-xl mb-4 sm:mb-6 font-bold text-center text-sm sm:text-base">Votre score a été enregistré !</div>`;
                 } else {
-                    messageHtml = `<div class="bg-orange-100 text-orange-800 p-4 rounded-xl mb-6 font-bold text-center">Vous avez obtenu ${state.currentScore}/${state.filteredQuestions.length}. Il faut 20/20 pour entrer dans le classement !</div>`;
+                    messageHtml = `<div class="bg-orange-100 text-orange-800 p-3 sm:p-4 rounded-xl mb-4 sm:mb-6 font-bold text-center text-sm sm:text-base">Vous avez obtenu ${state.currentScore}/${state.filteredQuestions.length}. Il faut 20/20 pour entrer dans le classement !</div>`;
                     correctionBtnHtml = `
-                        <button onclick="state.view = 'results'; render(); triggerAnimation();" class="w-full mb-4 flex items-center justify-center gap-2 bg-encp-darkpink text-white px-6 py-3 rounded-xl font-bold hover:bg-[#a03a50] transition-colors">
-                            <i data-lucide="file-check-2" class="w-5 h-5"></i> Voir la correction du quiz
+                        <button onclick="state.view = 'results'; render(); triggerAnimation();" class="w-full mb-3 sm:mb-4 flex items-center justify-center gap-2 bg-encp-darkpink text-white px-4 sm:px-6 py-3 rounded-xl font-bold hover:bg-[#a03a50] transition-colors text-sm sm:text-base">
+                            <i data-lucide="file-check-2" class="w-4 h-4 sm:w-5 sm:h-5"></i> Voir la correction du quiz
                         </button>
                     `;
                 }
                 restartBtnHtml = `
-                    <button onclick="startQuiz('challenge')" class="w-full mb-4 flex items-center justify-center gap-2 bg-encp-orange text-white px-6 py-3 rounded-xl font-bold hover:bg-[#c95000] transition-colors">
-                        <i data-lucide="rotate-cw" class="w-5 h-5"></i> Recommencer le challenge
+                    <button onclick="prepareChallenge()" class="w-full mb-3 sm:mb-4 flex items-center justify-center gap-2 bg-encp-orange text-white px-4 sm:px-6 py-3 rounded-xl font-bold hover:bg-[#c95000] transition-colors text-sm sm:text-base">
+                        <i data-lucide="rotate-cw" class="w-4 h-4 sm:w-5 sm:h-5"></i> Recommencer le challenge
                     </button>
                 `;
             }
@@ -1080,7 +1190,7 @@
             ];
             
             const tabsHtml = files.map(f => `
-                <button onclick="state.selectedFile = '${f.value}'; render();" class="px-4 py-2 text-sm font-bold rounded-lg transition-colors ${state.selectedFile === f.value ? 'bg-encp-dark text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+                <button onclick="state.selectedFile = '${f.value}'; render();" class="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors ${state.selectedFile === f.value ? 'bg-encp-dark text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
                     ${f.label}
                 </button>
             `).join('');
@@ -1097,33 +1207,33 @@
                 }
 
                 tableHtml = `
-                <div class="overflow-hidden rounded-xl border border-gray-200">
-                    <table class="w-full text-left border-collapse">
+                <div class="overflow-x-auto rounded-xl border border-gray-200">
+                    <table class="w-full text-left border-collapse min-w-[300px]">
                         <thead>
-                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                                <th class="p-4 font-bold">Rang</th>
-                                <th class="p-4 font-bold">Joueur</th>
-                                <th class="p-4 font-bold">Campus</th>
-                                <th class="p-4 font-bold text-right">Temps</th>
+                            <tr class="bg-gray-50 text-gray-500 text-[10px] sm:text-xs uppercase tracking-wider">
+                                <th class="p-2 sm:p-4 font-bold text-center sm:text-left w-10 sm:w-auto">#</th>
+                                <th class="p-2 sm:p-4 font-bold">Joueur</th>
+                                <th class="hidden sm:table-cell p-4 font-bold">Campus</th>
+                                <th class="p-2 sm:p-4 font-bold text-right">Temps</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             ${top10.map((s, idx) => {
                                 const isUser = (s.prenom + '_' + s.time) === state.lastChallengeEntry;
                                 let rankBadge = `${idx + 1}`;
-                                if (idx === 0) rankBadge = `<span class="text-yellow-500"><i data-lucide="trophy" class="w-5 h-5 inline"></i></span>`;
-                                else if (idx === 1) rankBadge = `<span class="text-gray-400"><i data-lucide="medal" class="w-5 h-5 inline"></i></span>`;
-                                else if (idx === 2) rankBadge = `<span class="text-amber-600"><i data-lucide="medal" class="w-5 h-5 inline"></i></span>`;
+                                if (idx === 0) rankBadge = `<span class="text-yellow-500"><i data-lucide="trophy" class="w-4 h-4 sm:w-5 sm:h-5 inline"></i></span>`;
+                                else if (idx === 1) rankBadge = `<span class="text-gray-400"><i data-lucide="medal" class="w-4 h-4 sm:w-5 sm:h-5 inline"></i></span>`;
+                                else if (idx === 2) rankBadge = `<span class="text-amber-600"><i data-lucide="medal" class="w-4 h-4 sm:w-5 sm:h-5 inline"></i></span>`;
                                 
                                 return `
                                 <tr class="${isUser ? 'bg-encp-lightpink/30' : 'bg-white'}">
-                                    <td class="p-4 font-bold text-gray-700">${rankBadge}</td>
-                                    <td class="p-4">
-                                        <div class="font-bold text-encp-dark">${s.prenom}</div>
-                                        <div class="text-xs text-gray-500">Promo ${s.promo}</div>
+                                    <td class="p-2 sm:p-4 font-bold text-gray-700 text-center sm:text-left text-sm sm:text-base">${rankBadge}</td>
+                                    <td class="p-2 sm:p-4">
+                                        <div class="font-bold text-encp-dark text-sm sm:text-base">${s.prenom}</div>
+                                        <div class="text-[10px] sm:text-xs text-gray-500">Promo ${s.promo} <span class="sm:hidden">• ${s.ville}</span></div>
                                     </td>
-                                    <td class="p-4 text-sm text-gray-600">${s.ville}</td>
-                                    <td class="p-4 text-right font-mono font-bold text-encp-orange">${formatTime(s.time)}</td>
+                                    <td class="hidden sm:table-cell p-4 text-sm text-gray-600">${s.ville}</td>
+                                    <td class="p-2 sm:p-4 text-right font-mono font-bold text-encp-orange text-xs sm:text-base whitespace-nowrap">${formatTime(s.time)}</td>
                                 </tr>
                                 `;
                             }).join('')}
@@ -1135,15 +1245,15 @@
                 if (userRank > 10) {
                     const s = currentSubjectScores[userRank - 1];
                     tableHtml += `
-                    <div class="mt-4 p-4 bg-encp-lightpink/30 rounded-xl border border-encp-lightpink flex justify-between items-center">
-                        <div class="flex items-center gap-4">
-                            <div class="font-bold text-gray-700">#${userRank}</div>
+                    <div class="mt-4 p-3 sm:p-4 bg-encp-lightpink/30 rounded-xl border border-encp-lightpink flex justify-between items-center">
+                        <div class="flex items-center gap-3 sm:gap-4">
+                            <div class="font-bold text-gray-700 text-sm sm:text-base">#${userRank}</div>
                             <div>
-                                <div class="font-bold text-encp-dark">${s.prenom}</div>
-                                <div class="text-xs text-gray-500">Promo ${s.promo}</div>
+                                <div class="font-bold text-encp-dark text-sm sm:text-base">${s.prenom}</div>
+                                <div class="text-[10px] sm:text-xs text-gray-500">Promo ${s.promo}</div>
                             </div>
                         </div>
-                        <div class="font-mono font-bold text-encp-orange">${formatTime(s.time)}</div>
+                        <div class="font-mono font-bold text-encp-orange text-xs sm:text-base">${formatTime(s.time)}</div>
                     </div>
                     `;
                 }
@@ -1151,10 +1261,10 @@
 
             return `
             <div class="max-w-3xl mx-auto">
-                <div class="bg-white rounded-3xl shadow-xl p-8 md:p-10 border border-gray-100">
-                    <div class="flex items-center justify-center gap-3 mb-8">
-                        <i data-lucide="trophy" class="w-8 h-8 text-encp-orange"></i>
-                        <h2 class="text-3xl font-extrabold text-encp-dark">High Scores</h2>
+                <div class="bg-white rounded-3xl shadow-xl p-6 sm:p-8 md:p-10 border border-gray-100">
+                    <div class="flex items-center justify-center gap-2 sm:gap-3 mb-6 sm:mb-8">
+                        <i data-lucide="trophy" class="w-6 h-6 sm:w-8 sm:h-8 text-encp-orange"></i>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold text-encp-dark">High Scores</h2>
                     </div>
                     
                     ${messageHtml}
@@ -1165,11 +1275,11 @@
                     
                     ${tableHtml}
                     
-                    <div class="mt-8">
+                    <div class="mt-6 sm:mt-8">
                         ${correctionBtnHtml}
                         ${restartBtnHtml}
-                        <button onclick="resetQuiz()" class="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors">
-                            <i data-lucide="home" class="w-5 h-5"></i> Retour à l'accueil
+                        <button onclick="resetQuiz()" class="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors text-sm sm:text-base">
+                            <i data-lucide="home" class="w-4 h-4 sm:w-5 sm:h-5"></i> Retour à l'accueil
                         </button>
                     </div>
                 </div>
