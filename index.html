@@ -310,11 +310,14 @@
                 currentScore: state.currentScore,
                 lastChallengeEntry: state.lastChallengeEntry
             };
-            localStorage.setItem('quizy_state', JSON.stringify(stateToSave));
+            sessionStorage.setItem('quizy_state', JSON.stringify(stateToSave));
         }
 
         function loadState() {
-            const saved = localStorage.getItem('quizy_state');
+            // Nettoyage de l'ancien localStorage si présent
+            localStorage.removeItem('quizy_state');
+            
+            const saved = sessionStorage.getItem('quizy_state');
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
@@ -591,7 +594,7 @@
             state.trainingStats = { answered: 0, correct: 0 };
             state.currentScore = null;
             state.lastChallengeEntry = null;
-            localStorage.removeItem('quizy_state');
+            sessionStorage.removeItem('quizy_state');
             render();
             triggerAnimation();
         }
